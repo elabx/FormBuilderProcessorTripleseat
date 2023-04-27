@@ -1,0 +1,7 @@
+{
+  "title" : "Tripleseat API",
+  "version" : 1,
+  "summary" : "Tripleseat API",
+  "icon" : "smile-o",
+  "requires": "FormBuilder>=0.4.5"
+}

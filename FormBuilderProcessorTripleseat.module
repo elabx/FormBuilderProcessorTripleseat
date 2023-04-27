@@ -1,0 +1,128 @@
+<?php namespace ProcessWire;
+
+class FormBuilderProcessorTripleseat extends FormBuilderProcessorAction implements Module
+{
+	public function textToArray($text){
+		$value = explode("\n", $text);
+		$newValue = [];
+		foreach($value as $row){
+			$pos = strpos($row, '=');
+			if($pos) {
+				$key = trim(substr($row, 0, $pos));
+				$value = trim(substr($row, $pos+1));
+				$newValue[$key] = $value;
+			}
+		}
+		return $newValue;
+	}
+
+	public function processReady()
+	{
+		$this->addHookAfter('FormBuilderProcessor::saveForm', function ($event) {
+			/** @var $processor FormBuilderProcessor **/
+			$processor = $event->object;
+			$entryId = $event->return;
+			$form = $event->arguments(0);
+			$data = $processor->formToEntry($form, $entryId);
+
+			$url = $this->get('tripleseat_api_endpoint');
+			$form_id = $this->get('tripleseat_lead_form_id');
+
+			// The required fields
+			if (!$url || !$form_id) {
+				return;
+			}
+
+			$fields_to_format = $this->textToArray($this->get('tripleseat_date_formatter'));
+			$fields_to_add = $this->textToArray($this->get('tripleseat_add'));
+			$fields_to_rename = $this->textToArray($this->get('tripleseat_rename'));
+
+			// add fields
+			foreach($fields_to_add as $name => $value) {
+				$data[$name] = $value;
+			}
+
+			// rename fields
+			foreach($fields_to_rename as $name => $newName) {
+				if(!array_key_exists($name, $data)) continue;
+				$value = $data[$name];
+				unset($data[$name]);
+				$data[$newName] = $value;
+			}
+
+			// field formatting
+			foreach($data as $key => $v) {
+				if(array_key_exists($key, $fields_to_format)){
+					$data[$key] = date($fields_to_format[$key], $v);
+				}else{
+					$data[$key] = $v;
+				}
+			}
+
+			$post_value = ['lead' => [] ];
+			foreach($data as $key => $v){
+					$post_value['lead'][$key] = $v;
+			}
+
+			$post_value['lead_form_id'] = $form_id;
+
+			$http = new WireHttp();
+			$data = json_encode($post_value);
+
+			$http->setHeader('Content-Type' ,'application/json');
+			$r = $http->post($url, $data, [
+				'curl_setopt' => array(
+					CURLOPT_POSTFIELDS => $data,
+				),
+			]);
+
+			$c = $http->getHttpCode();
+			if($c != 200){
+				wire('log')->save('tripleaseat-fb-action-error', "Error in forms endpoint: {$r}");
+			}else{
+				wire('log')->save('tripleaseat-fb-action-forwarder', $r);
+			}
+		});
+	}
+
+	public function getConfigInputfields(InputfieldWrapper $inputfields)
+	{
+
+		$f = $this->modules->get('InputfieldText');
+		$f->attr('name', 'tripleseat_api_endpoint');
+		$f->label = 'API endpoint';
+		$f->val($this->get('tripleseat_api_endpoint'));
+		$inputfields->add($f);
+
+		$f = $this->modules->get('InputfieldText');
+		$f->attr('name', 'tripleseat_lead_form_id');
+		$f->label = 'Form ID';
+		$f->val($this->get('tripleseat_lead_form_id'));
+		$inputfields->add($f);
+
+		$f = $this->modules->get('InputfieldTextarea');
+		$f->attr('name', 'tripleseat_add');
+		$f->label = 'Add fields';
+		$f->description = 'Add fields that are not set in the form';
+		$f->val($this->get('tripleseat_add'));
+		$inputfields->add($f);
+
+		$f = $this->modules->get('InputfieldTextarea');
+		$f->attr('name', 'tripleseat_rename');
+		$f->label = 'Rename fields';
+		$f->description = 'Rename fields, enter one per line below in the format: [field_name]=[date_format]';
+		$f->val($this->get('tripleseat_rename'));
+		$inputfields->add($f);
+
+		$f = $this->modules->get('InputfieldTextarea');
+		$f->attr('name', 'tripleseat_date_formatter');
+		$f->label = 'Format date fields';
+		$f->description = 'Specify a format for date fields , enter one per line below in the format: [field_name]=[date_format]';
+		$f->notes = 'IMPORTANT: This happens AFTER the rename options have been applied. Take that into account when naming the field in the this configuration.
+								Get [Date Formats in php.net](https://www.php.net/manual/en/datetime.format.php)';
+
+		$f->val($this->get('tripleseat_date_formatter'));
+		$inputfields->add($f);
+
+	}
+}
