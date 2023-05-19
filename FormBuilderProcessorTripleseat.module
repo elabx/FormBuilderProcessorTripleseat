@@ -2,7 +2,19 @@
 
 class FormBuilderProcessorTripleseat extends FormBuilderProcessorAction implements Module
 {
-	public function textToArray($text){
+	public static function getModuleInfo()
+	{
+		return array(
+			'title'   => 'Tripleseat Lead Form API Integration',
+			'version' => 1,
+			'summary' => 'Forwards forms to Tripleseat using their Lead Form API',
+			"icon" => "smile-o",
+			"requires" => "FormBuilder>=0.4.5"
+		);
+	}
+	
+	public function textToArray($text)
+	{
 		$value = explode("\n", $text);
 		$newValue = [];
 		foreach($value as $row){
