@@ -1,0 +1,7 @@
+{
+  "title" : "Tripleseat Lead Form API Integration",
+  "version" : 1,
+  "summary" : "Forwards forms to Tripleseat using their Lead Form API",
+  "icon" : "smile-o",
+  "requires": "FormBuilder>=0.4.5"
+}
